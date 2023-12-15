@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: go-server-replica
+  labels:
+    app: go-server-replica-label
+spec:
+  selector:
+    matchLabels:
+      app: go-server-replica-label
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: "go-server-label"
+    spec:
+      containers:
+        - name: go-server-container
+          image: "juliucesar/kube-golang:latest"

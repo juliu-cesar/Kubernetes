@@ -118,3 +118,78 @@ Para verificar a quantidade de nodes de em pé podemos executar o mesmo comando 
 Temos uma extensão para o VsCode que facilita o processo de visualização e mudança de contexto, que se chama [Kubernetes](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-kubernetes-tools). Ela cria uma nova aba na Barra de atividades onde temos diversas informações sobre os contextos cadastrados na maquina, e o cluster selecionado.
 
 > Também é possível verificar os contextos cadastrados com o comando `kubectl config get-clusters`.
+
+## Criando o primeiro Pod
+
+O processo de criar um Pod é bastante simples, bastando criar um arquivo declarativo `.yaml` e definir algumas especificações, vejamos o exemplo para o arquivo `kube-go/pod.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: "go-server"
+  labels: 
+    app: "go-server-label"
+spec:
+  containers:
+    - name: go-server-container
+      image: "juliucesar/kube-golang:latest"
+```
+
+- apiVersion: Define a versão da api do Kubernetes.
+- kind: Define o tipo de objeto Kubernetes que sera criado.
+- metadata: Contem os metadados que identificam o objeto.
+  - name: Define o nome do objeto.
+  - label: Cria uma etiqueta para o objeto, que ajuda na sua identificação e permite filtro-los quando for efetuado uma busca entre os objetos criados.
+- spec: Define as especificações do objeto.
+  - containers: Lista os containers que serão executados no Pod.
+
+> Dentro da pasta `kube-go` criamos um programa muito simples em Golang para ser executado dentro dos containers.
+
+O proximo passo é aplicar essas configurações de Pod no Cluster criado no passo anterior [Criando múltiplos Nodes](#criando-múltiplos-nodes). Para isso vamos utilizar o comando:
+
+```bash
+kubectl apply -f kube-go/pod.yaml
+```
+
+Apos esse processo temos o Pod criado, e para verificar isso basta executar o comando `kubectl get pods`, que deve retornar algumas informações dele.
+
+## Utilizando o ReplicaSet
+
+Um dos processos mais importantes do Kubernetes é seu gerenciamento de containers, e isso não ocorre quando criamos manualmente os Pods como foi feito acima. O processo que utilizaremos sera com o **ReplicaSet**, e que possui uma estrutura semelhante ao do Pod. Ainda dentro da pasta `kube-go` vamos adicionar o arquivo `replicaset.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: go-server-replica
+  labels:
+    app: go-server-replica-label
+spec:
+  selector:
+    matchLabels:
+      app: go-server-label
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: "go-server-label"
+    spec:
+      containers:
+        - name: go-server-container
+          image: "juliucesar/kube-golang:latest"
+```
+
+- apiVersion: Especifica a versão da API do Kubernetes usada para criar este objeto.
+- kind: Define o tipo de objeto que está sendo criado, que no caso é um ReplicaSet.
+- metadata: Contém metadados para identificar e descrever o objeto.
+- spec: Define as especificações do ReplicaSet.
+  - selector e matchLabels: Especifica a label do Pod que este ReplicaSet deve gerenciar, no caso todos que tenham a label `go-server-label`
+  - replicas: Indica o número desejado de réplicas dos Pods gerenciados por este ReplicaSet.
+  - template: Descreve o modelo para os Pods que serão criados e gerenciados.
+
+Para criar o ReplicaSet utilizaremos o mesmo comando anterior `kubectl apply -f kube-go/replicaset.yaml`. Com isso temos os Pods criados e caso algum deles caia, o Kubernetes se encarrega de subir novos para manter a quantidade definida.
+
+### O problema do ReplicaSet
+
+Suponhamos que houve atualizações no programa feito em Golang, e uma nova imagem Docker foi criada, então logo atualizamos o campo `image` do ReplicaSet para a nova versão e efetuamos o apply do arquivo. Porem o que o Kubernetes faz é aplicar a atualização somente nos novos Pods criados, onde os que continuam rodando, mantém a versão antiga. Ou seja, seria necessário excluir todos os Pods manualmente para que os novos fossem criado com a atualização. Para resolver esse problema temos então o **Deployment**.
