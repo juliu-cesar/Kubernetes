@@ -192,4 +192,79 @@ Para criar o ReplicaSet utilizaremos o mesmo comando anterior `kubectl apply -f 
 
 ### O problema do ReplicaSet
 
-Suponhamos que houve atualizações no programa feito em Golang, e uma nova imagem Docker foi criada, então logo atualizamos o campo `image` do ReplicaSet para a nova versão e efetuamos o apply do arquivo. Porem o que o Kubernetes faz é aplicar a atualização somente nos novos Pods criados, onde os que continuam rodando, mantém a versão antiga. Ou seja, seria necessário excluir todos os Pods manualmente para que os novos fossem criado com a atualização. Para resolver esse problema temos então o **Deployment**.
+Suponhamos que houve atualizações no programa feito em Golang, e uma nova imagem Docker foi criada, então logo atualizamos o campo `image` do ReplicaSet para a nova versão e efetuamos o apply do arquivo. Porem o que o Kubernetes faz é aplicar a atualização somente nos novos Pods criados, onde os que continuam rodando, mantém a versão antiga. Ou seja, seria necessário excluir todos os Pods manualmente para que os novos fossem criado com a atualização. Vejamos como resolver esse problema no tópico seguinte.
+
+> Podemos obter as informações de um Pod com o comando `kubectl describe pod nome_do_pod`.
+
+## Deployment
+
+Bastante parecido com o ReplicaSet, o Deployment cria objetos de acordo com um estado que foi definido. Este objeto nada mais é que um ReplicaSet em si, ou seja, temos `deployment` que cria o `replicaset` que cria os `pods`. O conceito por traz do Deployment é bastante importante, mas sua implementação é bastante simples, vejamos como fica o arquivo `deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+# Código omitido
+```
+
+Basta mudar o tipo de objeto criado e aplicar essas mudanças com o mesmo código visto anteriormente (*kubectl apply*) que teremos o Deployment criado. Caso seja feita alguma atualização ou algo que mude o estado dos Pods, o deployment se encarrega de **gradualmente** substituir os Pods antigos pelos novos. Apesar de simples, esta ferramente é muito util e sera utilizada diversas vezes. 
+
+### Rollout e Revisões
+
+Algo muito interessante com o Deployment, é que quando é feito a atualização/alteração no estado dos Pods, além dele criar um novo ReplicaSet ele também mantém o anterior. E graças a isso podemos efetuar um Rollout, que é o processo de retornar o estado para uma versão anterior. Suponhamos que houve algum erro com a nova versão dos Pods, podemos utilizar o seguinte comando:
+
+```bash
+kubectl rollout undo deployment nome_do_deployment
+
+kubectl rollout undo deployment nome_do_deployment --to-revision=numero_da_revisao
+```
+
+O primeiro comando retorna para a versão anterior, e o segundo para qualquer versão escolhida. Podemos verificar no numero da revisão com o comando `kubectl rollout history deployment nome_do_deployment`.
+
+## Services
+
+O Service é uma abstração lógica para expor as aplicações implementadas dentro do cluster Kubernetes para outras aplicações dentro ou fora do cluster. Ele fornece uma maneira estável de acessar os Pods que estão executando sua aplicação, independentemente de onde esses Pods estejam localizados no cluster. Vejamos algumas de suas características:
+
+- Balanceamento de Carga: Os Services ja possuem por padrão um balanceamento de carga, onde ao receber uma requisição, ele redirecionara para o Pod numero um, então para o numero dois, para o tres e assim sucessivamente.
+- Tipos de Services: Existem diferentes tipos de Services no Kubernetes, incluindo:
+  - ClusterIP: Expõe o Service somente dentro do cluster.
+  - NodePort: Expõe o Service em um determinado porto em cada nó do cluster.
+  - LoadBalancer: Provisionar um balanceador de carga externo (no caso de um provedor de nuvem suportado) para expor o Service.
+  - ExternalName: Redirecionar solicitações para um nome de serviço externo (por exemplo, um serviço fora do cluster).
+- Seleção de Pods: Os Services usam etiquetas (labels) para selecionar os Pods aos quais devem direcionar o tráfego. Eles podem direcionar o tráfego para um conjunto específico de Pods com base nas tags associadas a esses Pods.
+
+### Criando um Service
+
+Ainda dentro da pasta `kube-go` vamos adicionar o arquivo `service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-server-service
+spec:
+  selector:
+    app: go-server-label
+  type: ClusterIP
+  ports:
+  - name: go-server-service
+    port: 80
+    protocol: TCP
+```
+
+- spec: Define as especificações do Service.
+  - selector: Define para quais Pods o Service deve direcionar o tráfego. Neste caso, os Pods com o rótulo `app: go-server-label` serão selecionados para receber o tráfego.
+  - type: Define o tipo do Service.
+- ports: Especifica as portas que o Service expõe.
+  - name: Apesar de não ser necessário, é bastante recomendado colocar um nome para a porta do Service.
+  - port: O número da porta que o Service escuta.
+  - protocol: O protocolo de rede usado (geralmente TCP ou UDP).
+
+Para criar o service, utilizamos o mesmo comando `kubectl apply`. Porem mesmo assim não é possível acessar o serviço, e isso ocorre por que o Kubernetes disponibiliza a porta apenas para a rede interna. Podemos utilizar o seguinte comando para fazer um redirecionamento:
+
+```bash
+kubectl port-forward svc/nome_do_service 8000:80
+```
+
+> O `svc` ou `service` indica que esse processo sera aplicado em um Service.
+

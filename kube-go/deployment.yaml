@@ -1,9 +1,9 @@
 apiVersion: apps/v1
-kind: ReplicaSet
+kind: Deployment
 metadata:
-  name: go-server-replica
+  name: go-server-deployment
   labels:
-    app: go-server-replica-label
+    app: go-server-deployment-label
 spec:
   selector:
     matchLabels:
