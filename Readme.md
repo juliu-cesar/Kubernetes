@@ -228,7 +228,7 @@ O Service é uma abstração lógica para expor as aplicações implementadas de
 - Balanceamento de Carga: Os Services ja possuem por padrão um balanceamento de carga, onde ao receber uma requisição, ele redirecionara para o Pod numero um, então para o numero dois, para o tres e assim sucessivamente.
 - Tipos de Services: Existem diferentes tipos de Services no Kubernetes, incluindo:
   - ClusterIP: Expõe o Service somente dentro do cluster.
-  - NodePort: Expõe o Service em um determinado porto em cada nó do cluster.
+  - NodePort: Expõe o Service em uma determinada porta que pode ser acessada utilizando o IP de um node. Ou seja, independente de que Node for acessado, ao passar a porta definida, ira cair no Service.
   - LoadBalancer: Provisionar um balanceador de carga externo (no caso de um provedor de nuvem suportado) para expor o Service.
   - ExternalName: Redirecionar solicitações para um nome de serviço externo (por exemplo, um serviço fora do cluster).
 - Seleção de Pods: Os Services usam etiquetas (labels) para selecionar os Pods aos quais devem direcionar o tráfego. Eles podem direcionar o tráfego para um conjunto específico de Pods com base nas tags associadas a esses Pods.
@@ -268,3 +268,114 @@ kubectl port-forward svc/nome_do_service 8000:80
 
 > O `svc` ou `service` indica que esse processo sera aplicado em um Service.
 
+#### TargetPort
+
+Suponhamos que a porta para acessar o service e o container não fossem as mesmas, poderíamos então utilizar o campo `targetPort` para indicar qual seria a porta do container, por exemplo:
+
+```yaml
+- name: go-server-service
+  port: 80
+  targetPort: 9000
+```
+
+Com isso podemos acessar o serviço pela porta 80, enquanto ele ira redirecionar para o container na porta 9000. No arquivo do tópico anterior não precisamos fazer essa passo pois ambas as portas eram iguais, tanto a do container como o do service eram 80.
+
+### NodePort
+
+O NodePort é um tipo de Service que permite acessar o serviço externamente. Para este objeto utilizamos portas altas, ou seja entre `30000` e `32767`. Vejamos um exemplo abaixo:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-server-service
+spec:
+  selector:
+    app: go-server-label
+  type: NodePort
+  ports:
+  - name: go-server-service
+    port: 80
+    protocol: TCP
+    nodePort: 30001
+```
+
+Dessa forma, ao acessar qualquer um dos Nodes passando a porta `300001`, sera redirecionado para a porta 80 do service, que por sua vez vai redirecionar para o container.
+
+Apesar deste tipo poder ser utilizado, **não é muito recomendado**, principalmente por questões de segurança, e também temos o proximo tipo que acaba sendo mais util.
+
+### LoadBalancer
+
+O LoadBalancer é um dos tipos de Service que oferece um recurso nativo para disponibilizar um balanceador de carga externo para expor um aplicativo para fora do cluster. Geralmente utilizado com algum provedor em nuvem, dessa forma ao criar esse objeto, sera atribuído um ip externo, que nos permite acessar o Service de fora do cluster. Para criar ele basta mudar o campo do tipo:
+
+```yaml
+type: LoadBalancer
+```
+
+## Acessando a API do Kubernetes através de um proxy
+
+O Kubernetes funciona disponibilizando uma api, e podemos acessa-la diretamente utilizando um proxy, vejamos o comando para isso:
+
+```bash
+kubectl proxy --port=8080   
+```
+
+Com isso podemos acessar a api utilizando o endereço `http://localhost:8080`. Nele temos todas as rotas disponíveis e diversas informações. Por exemplo, podemos acessar as informações de um service com o endereço `http://localhost:8080/api/v1/namespaces/default/services/nome_do_service`.
+
+## Configurando variáveis de ambiente
+
+Temos algumas formas para configurar variaveis de ambiente no container. Vejamos algumas
+
+- Adicionando diretamente ao arquivo `Deployment`, no campo `env` passamos o nome e o valor.:
+
+```yaml
+# código omitido
+containers:
+  - name: go-server-container
+    image: "juliucesar/kube-golang:v3"
+    env:
+      - name: NAME
+        value: "Juliu Cesar"
+      - name: AGE
+        value: "255"
+```
+- Criando um ConfigMap para centralizar as variáveis de ambiente. Esta opção é mais recomendada que a anterior, uma vez que configuramos um arquivo separado apenas para estas variáveis. Vamos criar o arquivo `config-env.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: go-server-env
+data:
+  NAME: "Juliu Cesar"
+  AGE: "255"
+```
+
+Apos isso é preciso fazer uma referencia à esses campos no arquivo `deployment`:
+
+```yaml
+containers:
+  - name: go-server-container
+    image: "juliucesar/kube-golang:v3"
+    env:
+      - name: NAME
+        valueFrom:
+          configMapKeyRef:
+            name: go-server-env
+            key: NAME
+      - name: AGE
+        valueFrom:
+          configMapKeyRef:
+            name: go-server-env
+            key: AGE
+```
+
+Utilizamos o `valueFrom` para indicar que o valor vira de outro arquivo, e `configMapKeyRef` para informar qual o nome do Map que estamos referenciando e o campo com o valor definido. Em seguida precisamos aplicar o Map e atualizar o Deployment.
+
+> Caso seja atualizado o Map, essas mudanças não serão refletidas automaticamente no Deployment, é necessário atualiza-lo manualmente.
+
+```bash
+kubectl apply -f kube-go/config-env.yaml
+
+kubectl apply -f kube-go/deployment.yaml
+```

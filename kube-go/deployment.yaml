@@ -8,7 +8,7 @@ spec:
   selector:
     matchLabels:
       app: go-server-label
-  replicas: 5
+  replicas: 1
   template:
     metadata:
       labels:
@@ -16,4 +16,16 @@ spec:
     spec:
       containers:
         - name: go-server-container
-          image: "juliucesar/kube-golang:latest"
+          image: "juliucesar/kube-golang:v3"
+          env:
+            - name: NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: go-server-env
+                  key: NAME
+
+            - name: AGE
+              valueFrom:
+                configMapKeyRef:
+                  name: go-server-env
+                  key: AGE
