@@ -13,7 +13,7 @@ Desenvolvido pela Google, o Kubernetes é uma plataforma de orquestração de co
 O Kubernetes opera em um ambiente de **cluster**, que é composto pela conexão de um conjunto de máquinas físicas ou virtuais que são chamados de **Nodes** (nós). Cada nó em um cluster Kubernetes desempenha um papel específico na operação do sistema e possui uma quantidade de vCPU e memoria.
 
 ### KubeCtl
-21091080
+
 O kubectl é a ferramenta de linha de comando principal para interagir com clusters Kubernetes. Ele atua como um cliente para a API do Kubernetes, permitindo que os usuários gerenciem recursos e executem operações no cluster.
 
 ### Cluster
